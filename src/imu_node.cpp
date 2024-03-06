@@ -22,8 +22,10 @@ class imu_node : public rclcpp::Node {
 public:
   imu_node() : Node("imu_sensor"), is_running_(true) {
 
+    std::string tros_distro
+        = std::string(std::getenv("TROS_DISTRO")? std::getenv("TROS_DISTRO") : "");
     this->declare_parameter("config_file_path",
-            "/opt/tros/lib/imu_sensor/config/bmi088.yaml");
+            "/opt/tros/" + tros_distro + "/lib/imu_sensor/config/bmi088.yaml");
     this->get_parameter("config_file_path", config_file_);
 
     std::ifstream fin(config_file_);
@@ -42,7 +44,7 @@ public:
       exit(-1);
     }
 
-    std::string imu_lib_path = "/opt/tros/lib/imu_sensor/lib" + imu_name_ + ".so";
+    std::string imu_lib_path = "/opt/tros/" + tros_distro + "/lib/imu_sensor/lib" + imu_name_ + ".so";
 
     so_handle_ = dlopen(imu_lib_path.c_str(), RTLD_LAZY);
     if (so_handle_ == nullptr) {

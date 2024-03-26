@@ -1,11 +1,11 @@
 English| [简体中文](./README_cn.md)
 
 Getting Started with IMU Sensor Node
----
-#Intro
+
+# Intro
 The imu_sensor package is used to publish sensor_msgs::msg::imu ROS2 topic, which includes angular velocity and linear acceleration of object motion with fine-tuned timestamps.
 This article details how to compile and use the imu_sensor package.
----
+
 
 # Build
 
@@ -22,6 +22,7 @@ ros2 package：
 - Platform: X3
 - Operating System: Ubuntu 20.04
 - Compiling Toolchain: Linux GCC 9.3.0/Linaro GCC 9.3.0
+
 ## package Description
 After the compilation of the imu_sensor package, the config and launch directories and .so library are respectively installed in the
 install/lib/imu_sensor or install/share/imu_sensor directory.
@@ -47,7 +48,7 @@ The package supports compilation on the X3 board and cross-compilation on a PC.
 
 - Compilation command: 
 
-  ``````bash
+```bash
 export TARGET_ARCH=aarch64
 export TARGET_TRIPLE=aarch64-linux-gnu
 export CROSS_COMPILE=/usr/bin/$TARGET_TRIPLE-
@@ -80,7 +81,7 @@ ros2 launch imu_sensor imu_sensor.launch.py
 ```
 
 Where config_file_path is the configuration file, and the meanings of the fields i2c_bus, data range, and bandwidth in the configuration file are as follows.
-```YAML
+```yaml
 name: "bmi088"
 # i2c_bus number
 i2c_bus: 1
@@ -98,16 +99,16 @@ group_delay: 7
 # imu_data_path from which we read imu data
 imu_data_path: "/dev/input/event2"
 # imu_virtual_path from which we init imu
-```imu_virtual_path: "/sys/devices/virtual/input/input0/"
+imu_virtual_path: "/sys/devices/virtual/input/input0/"
+```
 
----
 
 ## X3 linaro
 Copy the install directory cross compiled by docker to X3 directory, 
 such as `/userdata`. Then run command:
-````
+```
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/userdata/install/lib`
-````
+```
 
 Change ROS_LOG_DIR and run `mount -o remount,rw /`
 ```

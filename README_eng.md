@@ -46,7 +46,7 @@ the $TogetheROS_PATH depends on your install directory
 
 1、verify your compiling environment
 - Please refer docker environment deployment documentary
- (https://c-gitlab.horizon.ai/HHP/robot_dev_config/-/blob/develop/README.md)
+ (https://github.com/D-Robotics/robot_dev_config/blob/develop/README.md)
   for deploying your cross compiling environment.
 
 

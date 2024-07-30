@@ -4,7 +4,7 @@
   <name>imu_sensor</name>
   <version>2.0.1</version>
   <description>A TogetheROS Driver for IMU</description>
-  <maintainer email="huaiyu.zhang@horizon.ai">zhy</maintainer>
+  <maintainer email="huaiyu.zhang@d-robotics.cc">zhy</maintainer>
   <license>Apache License 2.0</license>
   
   <buildtool_depend>ament_cmake_auto</buildtool_depend>

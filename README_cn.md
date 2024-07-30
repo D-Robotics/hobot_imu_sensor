@@ -42,7 +42,7 @@ install/lib/imu_sensor or install/share/imu_sensor 目录下。
 
 1、确认编译环境
 - 参考这篇文档安装编译环境
- (https://c-gitlab.horizon.ai/HHP/robot_dev_config/-/blob/develop/README.md)
+ (https://github.com/D-Robotics/robot_dev_config/blob/develop/README.md)
 
 
 2、编译

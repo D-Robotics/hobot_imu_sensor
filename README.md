@@ -42,7 +42,7 @@ The package supports compilation on the X3 board and cross-compilation on a PC.
 
 1. Confirm the compilation environment
 - Refer to this document for installing the compilation environment
- (https://c-gitlab.horizon.ai/HHP/robot_dev_config/-/blob/develop/README.md)
+ (https://github.com/D-Robotics/robot_dev_config/blob/develop/README.md)
 
 2. Compilation
 

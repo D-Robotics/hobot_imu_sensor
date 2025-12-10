@@ -34,22 +34,57 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
 
-include_directories(include
-  include/imu_sensor/
-)
+if(PLATFORM_X3)
+  message("build platform X3")
+  add_definitions(-DPLATFORM_X3)
+  set(PREFIX_PATH x3)
 
-set(BASE_LIBRARIES pthread yaml-cpp)
-file(GLOB_RECURSE BMI088_FILES
-        ${PROJECT_SOURCE_DIR}/src/sensors/*.cc
-        ${PROJECT_SOURCE_DIR}/src/sensors/*.cpp
-)
-add_library(bmi088 SHARED ${BMI088_FILES})
-target_link_libraries(bmi088 ${BASE_LIBRARIES})
+  include_directories(include
+    include/imu_sensor/ 
+  )
 
-file(GLOB_RECURSE CPP_FILES
-        ${PROJECT_SOURCE_DIR}/src/*.cc
-        ${PROJECT_SOURCE_DIR}/src/*.cpp
- )
+  set(BASE_LIBRARIES pthread yaml-cpp)
+  file(GLOB_RECURSE BMI088_FILES
+          ${PROJECT_SOURCE_DIR}/src/x3/sensors/*.cc
+          ${PROJECT_SOURCE_DIR}/src/x3/sensors/*.cpp
+  )
+  add_library(bmi088 SHARED ${BMI088_FILES})
+  target_link_libraries(bmi088 ${BASE_LIBRARIES})
+
+  file(GLOB_RECURSE CPP_FILES
+          ${PROJECT_SOURCE_DIR}/src/x3/*.cc
+          ${PROJECT_SOURCE_DIR}/src/x3/*.cpp
+  )
+  # Install executables
+  install(
+    TARGETS ${PROJECT_NAME} bmi088
+    RUNTIME DESTINATION lib/${PROJECT_NAME}/
+    LIBRARY DESTINATION lib/${PROJECT_NAME}/
+  )
+elseif(PLATFORM_X5)
+  message("build platform X5")
+  add_definitions(-DPLATFORM_X5)
+  set(PREFIX_PATH x5)
+  include_directories(include
+    include/imu_sensor/ 
+    include
+  )
+
+  set(BASE_LIBRARIES pthread yaml-cpp)
+
+  file(GLOB_RECURSE CPP_FILES
+    ${PROJECT_SOURCE_DIR}/src/x5/sensors/*.cc
+    ${PROJECT_SOURCE_DIR}/src/x5/sensors/*.cpp
+    ${PROJECT_SOURCE_DIR}/src/x5/*.cc
+    ${PROJECT_SOURCE_DIR}/src/x5/*.cpp
+  )
+else()
+  message("invalid platform, build platform X3 default")
+  add_definitions(-DPLATFORM_X3)
+  set(PREFIX_PATH x3)
+endif()  
+
+
 add_executable(${PROJECT_NAME}
   ${CPP_FILES}
 )
@@ -66,21 +101,19 @@ ament_target_dependencies(
   yaml_cpp_vendor
   )
 
-# Install executables
 install(
-  TARGETS ${PROJECT_NAME} bmi088
-  RUNTIME DESTINATION lib/${PROJECT_NAME}/
-  LIBRARY DESTINATION lib/${PROJECT_NAME}/
+  TARGETS ${PROJECT_NAME}
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY
-  ${PROJECT_SOURCE_DIR}/config/
+  ${PROJECT_SOURCE_DIR}/config/${PREFIX_PATH}/
   DESTINATION lib/${PROJECT_NAME}/config/
 )
 
 install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}/
+  launch/${PREFIX_PATH}/
+  DESTINATION share/${PROJECT_NAME}/launch/
 )
 
 ament_package()

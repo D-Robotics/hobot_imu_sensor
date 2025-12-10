@@ -24,3 +24,4 @@ struct imu_struct {
   virtual int read(ImuDataType &imu_data) = 0;
   virtual int deinit() = 0;
 };
+

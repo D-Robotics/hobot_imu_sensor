@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import sys
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess
+from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
-import os
 from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
+from launch_ros.actions import LoadComposableNodes
 
 def declare_configurable_parameters(parameters):
     args = []
@@ -50,13 +54,20 @@ def generate_launch_description():
     ]
 
     launch = declare_configurable_parameters(node_params)
-    launch.append(Node(
-        package='imu_sensor',
-        executable='drobotics_imu_node',
-        name=LaunchConfiguration('drobotics_imu_name'),
-        output='screen',
-        parameters=[set_configurable_parameters(node_params)],
-        arguments=['--ros-args', '--log-level', LaunchConfiguration('imu_log_level')]
-    ))
+    launch.append(
+        LoadComposableNodes(
+            target_container=LaunchConfiguration("target_container_name"),
+            composable_node_descriptions=[
+                ComposableNode(
+                    package="imu_sensor",
+                    namespace='',
+                    plugin="drobotics::ImuComponent",
+                    name="drobotics_imu_component",
+                    parameters=[set_configurable_parameters(node_params)],
+                    extra_arguments=[{"use_intra_process_comms": True}],
+                )
+            ]
+        )
+    )
 
     return LaunchDescription(launch)

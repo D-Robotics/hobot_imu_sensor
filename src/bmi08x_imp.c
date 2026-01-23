@@ -16,13 +16,13 @@
 
 #define LOG_ERR(fmt, ...) \
     do { \
-        fprintf(stderr, "[ERROR] [%s: h%d] " fmt "\n", \
+        fprintf(stderr, "[ERROR] [%s: %dh] " fmt "\n", \
                  __FILE__, __LINE__, ##__VA_ARGS__); \
     } while (0)
 
 #define LOG_INFO(fmt, ...) \
     do { \
-        fprintf(stdout, "[INFO] [%s:h%d] " fmt "\n", \
+        fprintf(stdout, "[INFO] [%s: %dh] " fmt "\n", \
                  __FILE__, __LINE__, ##__VA_ARGS__); \
     } while (0)
 
@@ -111,6 +111,18 @@ static int read_iio_sensor_data(
   float cpu_time_used;
   clock_t start, end;
   char buffer[256] = {0};
+  iio_event_data event;
+  ret = read(device->event_fd, &event, sizeof(event));
+  if (ret < 0) {
+    LOG_ERR("read failed, fd: %d, ret: %d, errno: %s", device->event_fd, ret, strerror(errno));
+    return -1;
+  }
+
+  if (ret != sizeof(event)) {
+    printf("Event data broken：%d/%zu bytes\n", ret, sizeof(event));
+    return -1;
+  }
+
   start = clock();
   device->data_fp = fopen(device->data_node, "r");
   if (device->data_fp != NULL) {
@@ -181,7 +193,7 @@ static int read_event_sensor_data(
         if (ev.code == SYN_REPORT) {
           *ts = (uint64_t)ev.time.tv_sec * 1e9 + (uint64_t)ev.time.tv_usec * 1e3;
         }
-      break;
+      return 0;
     }
   }
   return 0;
@@ -249,17 +261,21 @@ int bmi08x_device_open(Bmi08xDevice *device) {
 
   if (device->imu_device_type == IMU_DEVICE_TYPE_IIO) {
     device->event_fd = get_imu_iio_event_fd(device->iio_device);
+    LOG_INFO("Open iio device: %s succeed, event_fd: %d", device->iio_device, device->event_fd);
   } else if (device->imu_device_type == IMU_DEVICE_TYPE_INPUT) {
     device->event_fd = get_imu_input_event_fd(device->data_node);
+    LOG_INFO("Open event device: %s succeed, event_fd: %d", device->data_node, device->event_fd);
   }
 
-  if (device->event_fd > 0) {
-    LOG_INFO("Get event fd succeed: %d", device->event_fd);
-  } else {
+  if (device->event_fd < 0) {
     LOG_ERR("Get event fd failed, data_node: %s, device: %s",
             device->data_node, device->iio_device);
     return -1;
   }
+
+  device->gscale = device->gyro_range / pow(2, 16) * 2.0f;
+  device->ascale = device->acc_range / pow(2, 16) * 2.0f;
+
   LOG_INFO("bmi08x_device_open succeed!");
   return 0;
 }
@@ -276,6 +292,7 @@ int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame) {
     LOG_ERR("Bmi08xDevice or Bmi08xFrame is null!\n");
     return -1;
   }
+
   FD_ZERO(&readfds);
   FD_SET(device->event_fd, &readfds);
   timeout.tv_sec = 1;
@@ -293,17 +310,6 @@ int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame) {
   }
 
   if (FD_ISSET(event_fd, &readfds)) {
-    ret = read(event_fd, &frame->event, sizeof(frame->event));
-    if (ret < 0) {
-      LOG_ERR("read failed, fd: %d, ret: %d, errno: %s", event_fd, ret, strerror(errno));
-      return -1;
-    }
-
-    if (ret != sizeof(frame->event)) {
-      printf("Event data broken：%d/%zu bytes\n", ret, sizeof(frame->event));
-      return -1;
-    }
-
     if (device->imu_device_type == IMU_DEVICE_TYPE_IIO) {
       if (read_iio_sensor_data(device, &ax, &ay, &az, &gx, &gy, &gz, &data_ts) != 0) {
         LOG_ERR("read_sensor_data failed");

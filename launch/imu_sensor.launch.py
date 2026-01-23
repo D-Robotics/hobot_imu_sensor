@@ -47,7 +47,7 @@ def generate_launch_description():
         {'name':'imu_gyro_bandwidth', 'default_value': 47, 'description': 'imu_gyro_bandwidth'},
         {'name':'imu_group_delay', 'default_value': 7, 'description': 'imu_group_delay'},
         {'name':'imu_gravity', 'default_value': 9.80665, 'description': 'imu_gravity'},
-        {'name':'imu_log_level', 'default_value': 'info', 'description': 'imu_log_level'},
+        {'name':'imu_log_level', 'default_value': 'warn', 'description': 'imu_log_level'},
     ]
 
     launch = declare_configurable_parameters(node_params)

@@ -128,18 +128,24 @@ void ImuComponent::pub_func() {
     diff = current_frame.sys_timestamp - last_frame.sys_timestamp;
     if (last_frame.sys_timestamp != 0 && diff * 1e-9 > 0.003) {
       lost_count++;
-      RCLCPP_ERROR(get_logger(), "Detect imu data lost!, last ts: %fs, current ts: %fs, diff: %fs\n",
-                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9);
+      RCLCPP_ERROR(get_logger(), "Lost imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                                 "lost_count: %u, disorder_count: %u, repeated_count: %u\n",
+                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                   lost_count, disorder_count, repeated_count);
     }
     if (diff < 0) {
       disorder_count++;
-      RCLCPP_ERROR(get_logger(), "Detect imu data disorder!, last ts: %fs, current ts: %fs, diff: %fs\n",
-                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9);
+      RCLCPP_ERROR(get_logger(), "Disorder imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                                 "lost_count: %u, disorder_count: %u, repeated_count: %u\n",
+                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                   lost_count, disorder_count, repeated_count);
     }
     if (diff == 0) {
       repeated_count++;
-      RCLCPP_ERROR(get_logger(), "Detect imu data repeated!, last ts: %fs, current ts: %fs, diff: %fs\n",
-                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9);
+      RCLCPP_ERROR(get_logger(), "Repeated imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                                 "lost_count: %u, disorder_count: %u, repeated_count: %u\n",
+                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                   lost_count, disorder_count, repeated_count);
     }
     if (diff < min_diff) min_diff = diff;
     if (diff > max_diff) max_diff = diff;

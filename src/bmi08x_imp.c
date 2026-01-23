@@ -174,6 +174,7 @@ static int read_event_sensor_data(
     int16_t *gx, int16_t *gy, int16_t *gz,
     uint64_t *ts) {
   int event_cout = 0;
+  uint32_t ts_low = 0, ts_high = 0;
   struct input_event ev;
   int fd = device->event_fd;
   while (1) {
@@ -193,14 +194,14 @@ static int read_event_sensor_data(
           case ABS_RY: *gy = ev.value; break;
           case ABS_RZ: *gz = ev.value; break;
         }
-      break;
+        break;
       case EV_MSC:
         switch (ev.code) {
           case BMI088_MSC_TS_LOW:
-            *ts = ev.value;
+            ts_low = ev.value;
             break;
           case BMI088_MSC_TS_HIGH:
-            *ts |= ((uint64_t)ev.value << 32);
+            ts_high = ev.value;
             break;
           default:
             // LOG_ERROR("Un known MSC code: 0x%x, value: 0x%x", ev.code, ev.value);
@@ -209,7 +210,9 @@ static int read_event_sensor_data(
         break;
       case EV_SYN:
         if (ev.code == SYN_REPORT) {
-          //  LOG_INFO("event_cout: %d", event_cout);
+          *ts = ((uint64_t)ts_high << 32) | ts_low;
+          //LOG_INFO("ts: %u", ((uint64_t)ts_high << 32) | ts_low);
+          if (event_cout != 9) LOG_ERR("event_cout: %d", event_cout);
           return 0;
         }
     }

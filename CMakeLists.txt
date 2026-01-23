@@ -48,6 +48,7 @@ rclcpp_components_register_node(drobotics_imu_component
 ament_target_dependencies(
         drobotics_imu_component
         rclcpp
+        rclcpp_components
         sensor_msgs
 )
 
@@ -55,7 +56,8 @@ install(TARGETS drobotics_imu_component
         RUNTIME DESTINATION lib/${PROJECT_NAME})
 install(TARGETS drobotics_imu_node
         DESTINATION lib/${PROJECT_NAME})
-install(DIRECTORY config launch
+install(DIRECTORY launch
         DESTINATION share/${PROJECT_NAME})
 
 ament_package()
+

@@ -16,7 +16,7 @@
 
 #define LOG_ERR(fmt, ...) \
     do { \
-        fprintf(stderr, "[ERROR] [%s:h%d] " fmt "\n", \
+        fprintf(stderr, "[ERROR] [%s: h%d] " fmt "\n", \
                  __FILE__, __LINE__, ##__VA_ARGS__); \
     } while (0)
 
@@ -26,13 +26,18 @@
                  __FILE__, __LINE__, ##__VA_ARGS__); \
     } while (0)
 
-#define GET_SET_VALUE(fd, rregister, data, set_data, default_data) \
-  read_iic_register(fd, rregister, default_data); \
-  write_iic_register(fd, rregister, set_data);   \
-  read_iic_register(fd, rregister, data); \
-  printf(#rregister": [addr: 0x%02x, set value: 0x%02x, read value: 0x%02x, default value: 0x%02x]\n", \
+#define GET_SET_VALUE(fd, rregister, data, set_data, default_data, maxcount, maxcount_num) \
+  maxcount = maxcount_num; \
+  do { \
+       read_iic_register(fd, rregister, default_data); \
+       write_iic_register(fd, rregister, set_data);   \
+       read_iic_register(fd, rregister, data); \
+       printf(#rregister": [addr: 0x%02x, set value: 0x%02x, read value: 0x%02x, default value: 0x%02x]\n", \
          rregister, set_data, *data, *default_data);\
-  if (set_data != *data) { printf(#rregister"[ERROR] register set failed! \n"); continue;}
+       if (set_data != *data) { printf(#rregister"[ERROR] register set failed! \n"); } \
+       else { break; }    \
+  } while(maxcount-- >= 0);
+
 
 const uint8_t GYRO_INT4_INT3_IO_MAP_REGISTER = 0x18;
 const uint8_t GYRO_INT4_INT3_IO_CONF_REGISTER = 0x16;
@@ -183,7 +188,7 @@ static int read_event_sensor_data(
 }
 
 int bmi08x_device_open(Bmi08xDevice *device) {
-  int max_retry_count = 5;
+  int max_retry_count = 5, retry_count;
   char iic_bus_buffer[16];
   snprintf(iic_bus_buffer, sizeof(iic_bus_buffer), "/dev/i2c-%d", device->imu_iic_bus);
   int iic_gyro = get_iic_device_fd(iic_bus_buffer, 0x69);
@@ -192,41 +197,39 @@ int bmi08x_device_open(Bmi08xDevice *device) {
     return -1;
   }
 
-  while (max_retry_count-- >= 0) {
-    uint8_t data, set_data, default_data;
-    set_data = 0x80;  //  enable int4 pin, disable int3 pin
-    GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_MAP_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
-    set_data = 0x0A;  //  int4 push-pull, active high, int3 push-pull, active high
-    GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_CONF_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
-    set_data = 0x80;  //  enable new data triggered
-    GET_SET_VALUE(iic_gyro, GYRO_INT_CTRL_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
-    set_data = 0x83; //  400Hz
-    GET_SET_VALUE(iic_gyro, GYRO_BANDWIDTH_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
-    set_data = 0x01; // 0 -> +-2000, 1-> +- 1000, 2-> +- 500, 3-> +- 250, 4-> +- 125
-    GET_SET_VALUE(iic_gyro, GYRO_RANGE_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
+  uint8_t data, set_data, default_data;
+  set_data = 0x80;  //  enable int4 pin, disable int3 pin
+  GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_MAP_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
+  set_data = 0x0A;  //  int4 push-pull, active high, int3 push-pull, active high
+  GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_CONF_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
+  set_data = 0x80;  //  enable new data triggered
+  GET_SET_VALUE(iic_gyro, GYRO_INT_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
+  set_data = 0x83; //  400Hz
+  GET_SET_VALUE(iic_gyro, GYRO_BANDWIDTH_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
+  set_data = 0x01; // 0 -> +-2000, 1-> +- 1000, 2-> +- 500, 3-> +- 250, 4-> +- 125
+  GET_SET_VALUE(iic_gyro, GYRO_RANGE_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
 
-    //  0x44(01000100) map int2 int1 data ready
-    //  0x04(00000100) map int1 data ready
-    set_data = 0x44;
-    GET_SET_VALUE(iic_acc, ACC_INT_MAP_DATA_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
-    set_data = 0x09;  //  int2 input pin, activte high, push-pull
-    GET_SET_VALUE(iic_acc, ACC_INT2_IO_CTRL_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
-    set_data = 0x0A;  //  int1 output pin, activte high, push-pull
-    GET_SET_VALUE(iic_acc, ACC_INT1_IO_CTRL_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
-    set_data = 0x02; //  +-12G
-    GET_SET_VALUE(iic_acc, ACC_RANGE_REGISTER, &data, set_data, &default_data);
-    usleep(1000 * 100);
-    set_data = 0x8A; // OSR4, 400Hz
-    GET_SET_VALUE(iic_acc, ACC_CONF_REGISTER, &data, set_data, &default_data);
-  }
+  //  0x44(01000100) map int2 int1 data ready
+  //  0x04(00000100) map int1 data ready
+  set_data = 0x44;
+  GET_SET_VALUE(iic_acc, ACC_INT_MAP_DATA_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
+  set_data = 0x09;  //  int2 input pin, activte high, push-pull
+  GET_SET_VALUE(iic_acc, ACC_INT2_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
+  set_data = 0x0A;  //  int1 output pin, activte high, push-pull
+  GET_SET_VALUE(iic_acc, ACC_INT1_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
+  set_data = 0x02; //  +-12G
+  GET_SET_VALUE(iic_acc, ACC_RANGE_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+  usleep(1000 * 100);
+  set_data = 0x8A; // OSR4, 400Hz
+  GET_SET_VALUE(iic_acc, ACC_CONF_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
 
   close_iic_fd(iic_acc);
   close_iic_fd(iic_gyro);
@@ -292,7 +295,7 @@ int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame) {
   if (FD_ISSET(event_fd, &readfds)) {
     ret = read(event_fd, &frame->event, sizeof(frame->event));
     if (ret < 0) {
-      LOG_ERR("read failed, ret: %d, errno: %s", ret, strerror(errno));
+      LOG_ERR("read failed, fd: %d, ret: %d, errno: %s", event_fd, ret, strerror(errno));
       return -1;
     }
 

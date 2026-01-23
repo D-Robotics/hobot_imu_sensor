@@ -37,26 +37,28 @@ def set_configurable_parameters(parameters):
 
 def generate_launch_description():
     node_params = [
-        {'name':'imu_pub_topic', 'default_value': None, 'description': 'imu_pub_topic'},
-        {'name':'imu_iio_device', 'default_value': None, 'description': 'imu_iio_device'},
-        {'name':'imu_data_node', 'default_value': None, 'description': 'imu_data_node'},
-        {'name':'imu_iic_bus', 'default_value': None, 'description': 'imu_iic_bus'},
-        {'name':'imu_acc_range', 'default_value': None, 'description': 'imu_acc_range'},
-        {'name':'imu_acc_bandwidth', 'default_value': None, 'description': 'imu_acc_bandwidth'},
-        {'name':'imu_gyro_range', 'default_value': None, 'description': 'imu_gyro_range'},
-        {'name':'imu_gyro_bandwidth', 'default_value': None, 'description': 'imu_gyro_bandwidth'},
-        {'name':'imu_group_delay', 'default_value': None, 'description': 'imu_group_delay'},
-        {'name':'imu_gravity', 'default_value': None, 'description': 'imu_gravity'},
+        {'name':'imu_pub_topic', 'default_value': "~/bmi08x_imu", 'description': 'imu_pub_topic'},
+        {'name':'imu_iio_device', 'default_value': "/dev/iio:device1", 'description': 'imu_iio_device'},
+        {'name':'imu_data_node', 'default_value': "/dev/input/event1", 'description': 'imu_data_node'},
+        {'name':'imu_iic_bus', 'default_value': 5, 'description': 'imu_iic_bus'},
+        {'name':'imu_acc_range', 'default_value': 12, 'description': 'imu_acc_range'},
+        {'name':'imu_acc_bandwidth', 'default_value': 47, 'description': 'imu_acc_bandwidth'},
+        {'name':'imu_gyro_range', 'default_value': 1000, 'description': 'imu_gyro_range'},
+        {'name':'imu_gyro_bandwidth', 'default_value': 47, 'description': 'imu_gyro_bandwidth'},
+        {'name':'imu_group_delay', 'default_value': 7, 'description': 'imu_group_delay'},
+        {'name':'imu_gravity', 'default_value': 9.80665, 'description': 'imu_gravity'},
+        {'name':'imu_log_level', 'default_value': 'info', 'description': 'imu_log_level'},
     ]
 
     launch = declare_configurable_parameters(node_params)
     launch.append(Node(
         package='imu_sensor',
         executable='drobotics_imu_node',
-        name=LaunchConfiguration('drobotics_imu_name'),
+        name="drobotics_imu",
         output='screen',
         parameters=[set_configurable_parameters(node_params)],
         arguments=['--ros-args', '--log-level', LaunchConfiguration('imu_log_level')]
     ))
 
     return LaunchDescription(launch)
+

@@ -85,6 +85,7 @@ void ImuComponent::set_imu_instance() {
   bmi08x_device_.gyro_range = gyro_range;
   bmi08x_device_.gyro_bandwidth = gyro_bandwidth;
   ret = bmi08x_device_open(&bmi08x_device_);
+  std::cout << std::flush;
   if (ret != 0) {
     RCLCPP_FATAL(get_logger(), "bmi08x_device_open failed");
     rclcpp::shutdown();

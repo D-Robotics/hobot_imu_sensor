@@ -240,7 +240,21 @@ int bmi08x_device_open(Bmi08xDevice *device) {
   set_data = 0x83; //  400Hz
   GET_SET_VALUE(iic_gyro, GYRO_BANDWIDTH_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 100);
-  set_data = 0x01; // 0 -> +-2000, 1-> +- 1000, 2-> +- 500, 3-> +- 250, 4-> +- 125
+  // 0 -> +-2000, 1-> +- 1000, 2-> +- 500, 3-> +- 250, 4-> +- 125
+  switch (device->gyro_range) {
+    case 1000:
+      set_data = 0x01;
+      break;
+    case 500:
+      set_data = 0x02;
+      break;
+    case 250:
+      set_data = 0x03;
+      break;
+    default:
+      set_data = 0x00;
+      break;
+  }
   GET_SET_VALUE(iic_gyro, GYRO_RANGE_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 100);
 
@@ -256,6 +270,20 @@ int bmi08x_device_open(Bmi08xDevice *device) {
   GET_SET_VALUE(iic_acc, ACC_INT1_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 100);
   set_data = 0x02; //  +-12G
+  switch (device->acc_range) {
+    case 3:
+      set_data = 0x00;
+      break;
+    case 6:
+      set_data = 0x01;
+      break;
+    case 12:
+      set_data = 0x02;
+      break;
+    default:
+      set_data = 0x03;
+      break;
+  }
   GET_SET_VALUE(iic_acc, ACC_RANGE_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 100);
   set_data = 0x8A; // OSR4, 400Hz

@@ -126,7 +126,7 @@ void ImuComponent::pub_func() {
     imu_msg.angular_velocity.z = current_frame.gz * gravity_;
     imu_pub_->publish(imu_msg);
     diff = current_frame.sys_timestamp - last_frame.sys_timestamp;
-    if (last_frame.sys_timestamp != 0 && diff > 0.003) {
+    if (last_frame.sys_timestamp != 0 && diff * 1e-9 > 0.003) {
       lost_count++;
       RCLCPP_ERROR(get_logger(), "Detect imu data lost!, last ts: %fs, current ts: %fs, diff: %fs\n",
                    last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9);

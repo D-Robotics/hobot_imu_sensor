@@ -165,11 +165,15 @@ static int get_imu_input_event_fd(const char* input_dev_path) {
   return event_fd;
 }
 
+#define BMI088_MSC_TS_LOW  0x04
+#define BMI088_MSC_TS_HIGH 0x05
+
 static int read_event_sensor_data(
     Bmi08xDevice *device,
     int16_t *ax, int16_t *ay, int16_t *az,
     int16_t *gx, int16_t *gy, int16_t *gz,
     uint64_t *ts) {
+  int event_cout = 0;
   struct input_event ev;
   int fd = device->event_fd;
   while (1) {
@@ -178,8 +182,9 @@ static int read_event_sensor_data(
       LOG_ERR("read fd: %d failed, ret: %d", fd, ret);
       return -1;
     }
+    ++event_cout;
     switch (ev.type) {
-      case EV_ABS:  // 轴数据（加速度/陀螺仪）
+      case EV_ABS:
         switch (ev.code) {
           case ABS_X: *ax = ev.value; break;
           case ABS_Y: *ay = ev.value; break;
@@ -189,11 +194,24 @@ static int read_event_sensor_data(
           case ABS_RZ: *gz = ev.value; break;
         }
       break;
+      case EV_MSC:
+        switch (ev.code) {
+          case BMI088_MSC_TS_LOW:
+            *ts = ev.value;
+            break;
+          case BMI088_MSC_TS_HIGH:
+            *ts |= ((uint64_t)ev.value << 32);
+            break;
+          default:
+            // LOG_ERROR("Un known MSC code: 0x%x, value: 0x%x", ev.code, ev.value);
+            break;
+        }
+        break;
       case EV_SYN:
         if (ev.code == SYN_REPORT) {
-          *ts = (uint64_t)ev.time.tv_sec * 1e9 + (uint64_t)ev.time.tv_usec * 1e3;
+          //  LOG_INFO("event_cout: %d", event_cout);
+          return 0;
         }
-      return 0;
     }
   }
   return 0;
@@ -273,7 +291,7 @@ int bmi08x_device_open(Bmi08xDevice *device) {
     return -1;
   }
 
-  device->gscale = device->gyro_range / pow(2, 16) * 2.0f;
+  device->gscale = device->gyro_range / (pow(2, 16) * 2.0f - 1) * M_PI / 180.0;
   device->ascale = device->acc_range / pow(2, 16) * 2.0f;
 
   LOG_INFO("bmi08x_device_open succeed!");
@@ -328,6 +346,7 @@ int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame) {
     frame->gx = device->gscale * gx;
     frame->gy = device->gscale * gy;
     frame->gz = device->gscale * gz;
+    //  LOG_INFO("DataTS: %lu | ACC(%d, %d, %d) | GYRO(%d, %d, %d)\n", data_ts, ax, ay, az,gx, gy, gz);
   }
   return 0;
 }

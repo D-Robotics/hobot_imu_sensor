@@ -31,12 +31,14 @@
   maxcount = maxcount_num; \
   do { \
        read_iic_register(fd, rregister, default_data); \
-       write_iic_register(fd, rregister, set_data);   \
-       read_iic_register(fd, rregister, data); \
+       if (set_data != *default_data) { \
+         write_iic_register(fd, rregister, set_data);   \
+         read_iic_register(fd, rregister, data); \
+       } else { *data = *default_data; }  \
        printf(#rregister": [addr: 0x%02x, set value: 0x%02x, read value: 0x%02x, default value: 0x%02x]\n", \
          rregister, set_data, *data, *default_data);\
-       if (set_data != *data) { printf(#rregister"[ERROR] register set failed! \n"); } \
-       else { break; }    \
+       if (set_data != *data) { printf("[ERROR] " #rregister" register set failed! \n"); } \
+       else { printf("[OK] " #rregister" register set succeed! \n"); break; }    \
   } while(maxcount-- >= 0);
 
 
@@ -297,7 +299,10 @@ int bmi08x_device_open(Bmi08xDevice *device) {
       "echo 1 > %s/data_sync;",
       device->virtual_node, device->virtual_node);
 
+  LOG_INFO("excute: \n%s", iic_bus_buffer);
   system(iic_bus_buffer);
+
+  usleep(200 * 1000);
 
   uint8_t data, set_data, default_data;
   set_data = 0x80;  //  enable int4 pin, disable int3 pin

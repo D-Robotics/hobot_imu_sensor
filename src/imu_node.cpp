@@ -81,12 +81,12 @@ void ImuComponent::set_imu_instance() {
   int ret;
   bmi08x_device_.iio_device = iio_device_.c_str();
   bmi08x_device_.data_node = data_node_.c_str();
+  bmi08x_device_.virtual_node = virtual_node_.c_str();
   bmi08x_device_.imu_iic_bus = iic_bus_;
   bmi08x_device_.acc_range = acc_range;
   bmi08x_device_.acc_bandwidth = acc_bandwidth;
   bmi08x_device_.gyro_range = gyro_range;
   bmi08x_device_.gyro_bandwidth = gyro_bandwidth;
-  bmi08x_device_.virtual_node = virtual_node_;
   ret = bmi08x_device_open(&bmi08x_device_);
   std::cout << std::flush;
   if (ret != 0) {
@@ -115,6 +115,7 @@ void ImuComponent::pub_func() {
 
   while(rclcpp::ok()) {
     ret = bmi08x_get_frame(&bmi08x_device_, &current_frame);
+    std::cout << std::flush;
     if (ret != 0) {
       RCLCPP_FATAL(this->get_logger(), "bmi08x_get_frame failed");
       return;

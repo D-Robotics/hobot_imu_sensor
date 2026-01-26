@@ -34,7 +34,8 @@ private:
 private:
   Bmi08xDevice bmi08x_device_;
 private:
-  std::string imu_pub_topic_ = "~/bmi08x_imu", iio_device_ = IMU_IIO_DEV_PATH, data_node_ = IMU_INPUT_DEV_PATH;
+  std::string imu_pub_topic_ = "~/bmi08x_imu", iio_device_ = IMU_IIO_DEV_PATH,
+  data_node_ = IMU_INPUT_DEV_PATH, virtual_node_ = "/sys/devices/virtual/input/input1/";
   int iic_bus_ = 5;
   int acc_range = 12, gyro_range = 1000, acc_bandwidth = 40, gyro_bandwidth = 40, group_delay = 7;
   double gravity_ = 9.80665;
@@ -62,6 +63,7 @@ void ImuComponent::set_node_params() {
   DECLARE_PARAMETER("imu_pub_topic", imu_pub_topic_, imu_pub_topic_);
   DECLARE_PARAMETER("imu_iio_device", iio_device_, iio_device_);
   DECLARE_PARAMETER("imu_data_node", data_node_, data_node_);
+  DECLARE_PARAMETER("imu_virtual_node", virtual_node_, virtual_node_);
   DECLARE_PARAMETER("imu_iic_bus", iic_bus_, iic_bus_);
   DECLARE_PARAMETER("imu_acc_range", acc_range, acc_range);
   DECLARE_PARAMETER("imu_acc_bandwidth", acc_bandwidth, acc_bandwidth);
@@ -84,6 +86,7 @@ void ImuComponent::set_imu_instance() {
   bmi08x_device_.acc_bandwidth = acc_bandwidth;
   bmi08x_device_.gyro_range = gyro_range;
   bmi08x_device_.gyro_bandwidth = gyro_bandwidth;
+  bmi08x_device_.virtual_node = virtual_node_;
   ret = bmi08x_device_open(&bmi08x_device_);
   std::cout << std::flush;
   if (ret != 0) {

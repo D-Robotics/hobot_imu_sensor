@@ -44,6 +44,7 @@ def generate_launch_description():
         {'name':'imu_pub_topic', 'default_value': "~/bmi08x_imu", 'description': 'imu_pub_topic'},
         {'name':'imu_iio_device', 'default_value': "/dev/iio:device1", 'description': 'imu_iio_device'},
         {'name':'imu_data_node', 'default_value': "/dev/input/event1", 'description': 'imu_data_node'},
+        {'name':'imu_virtual_node', 'default_value': "/sys/devices/virtual/input/input1/", 'description': 'imu_config_node'},
         {'name':'imu_iic_bus', 'default_value': 5, 'description': 'imu_iic_bus'},
         {'name':'imu_acc_range', 'default_value': 12, 'description': 'imu_acc_range'},
         {'name':'imu_acc_bandwidth', 'default_value': 47, 'description': 'imu_acc_bandwidth'},

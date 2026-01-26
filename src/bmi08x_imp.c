@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <time.h>
 #include <linux/input.h>
+#include <stdlib.h>
 
 #define LOG_ERR(fmt, ...) \
     do { \
@@ -220,9 +221,70 @@ static int read_event_sensor_data(
   return 0;
 }
 
+static int read_event_sensor_data_v2(
+    Bmi08xDevice *device,
+    int16_t *ax, int16_t *ay, int16_t *az,
+    int16_t *gx, int16_t *gy, int16_t *gz,
+    uint64_t *ts) {
+  int event_cout = 0, index = 0, count = 0;
+  uint32_t ts_low = 0, ts_high = 0;
+  struct input_event ev;
+  int fd = device->event_fd;
+  while (1) {
+    ssize_t ret = read(fd, &ev, sizeof(ev));
+    if (ret != sizeof(ev)) {
+      LOG_ERR("read failed, ret: %d, sizeof(ev): %d", ret, sizeof(ev));
+      return -1;
+    }
+    if (ev.type != EV_SYN) {
+      switch (index++) {
+        case 0:
+          *ax = ev.value;
+          break;
+        case 1:
+          *ay = ev.value;
+          break;
+        case 2:
+          *az = ev.value;
+          break;
+        case 3:
+          *gx = ev.value;
+          break;
+        case 4:
+          *gy = ev.value;
+          break;
+        case 5:
+          *gz = ev.value;
+          break;
+        case 6:
+          ts_high = ev.value;
+          break;
+        case 7:
+          ts_low = ev.value;
+          break;
+        case 8:
+          count = ev.value;
+          break;
+        default:
+          break;
+      }
+      if (index == 9) {
+        *ts = ((uint64_t)ts_high << 32) | ts_low;
+        return 0;
+      }
+    } else {
+      if (index != 0) {
+        LOG_ERR("imu recv error, current index: %d", index);
+        index = 0;
+      }
+    }
+  }
+  return 0;
+}
+
 int bmi08x_device_open(Bmi08xDevice *device) {
   int max_retry_count = 5, retry_count;
-  char iic_bus_buffer[16];
+  char iic_bus_buffer[128];
   snprintf(iic_bus_buffer, sizeof(iic_bus_buffer), "/dev/i2c-%d", device->imu_iic_bus);
   int iic_gyro = get_iic_device_fd(iic_bus_buffer, 0x69);
   int iic_acc = get_iic_device_fd(iic_bus_buffer, 0x19);
@@ -230,11 +292,18 @@ int bmi08x_device_open(Bmi08xDevice *device) {
     return -1;
   }
 
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+      "echo 1 > %s/sensor_init;"
+      "echo 1 > %s/data_sync;",
+      device->virtual_node, device->virtual_node);
+
+  system(iic_bus_buffer);
+
   uint8_t data, set_data, default_data;
   set_data = 0x80;  //  enable int4 pin, disable int3 pin
   GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_MAP_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 100);
-  set_data = 0x0A;  //  int4 push-pull, active high, int3 push-pull, active high
+  set_data = 0x05;  //  int4 push-pull, active high, int3 push-pull, active high
   GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_CONF_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 100);
   set_data = 0x80;  //  enable new data triggered
@@ -263,10 +332,10 @@ int bmi08x_device_open(Bmi08xDevice *device) {
 
   //  0x44(01000100) map int2 int1 data ready
   //  0x04(00000100) map int1 data ready
-  set_data = 0x44;
+  set_data = 0x04;
   GET_SET_VALUE(iic_acc, ACC_INT_MAP_DATA_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 100);
-  set_data = 0x09;  //  int2 input pin, activte high, push-pull
+  set_data = 0x16;  //  int2 input pin, activte high, push-pull
   GET_SET_VALUE(iic_acc, ACC_INT2_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 100);
   set_data = 0x0A;  //  int1 output pin, activte high, push-pull
@@ -333,8 +402,8 @@ int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame) {
   int ret;
   fd_set readfds;
   struct timeval timeout;
-  int16_t ax, ay, az, gx, gy, gz;
-  uint64_t data_ts;
+  int16_t ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0;
+  uint64_t data_ts = 0;
   int event_fd;
 
   if (device == NULL || frame == NULL) {
@@ -365,7 +434,7 @@ int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame) {
         return -1;
       }
     } else if (device->imu_device_type == IMU_DEVICE_TYPE_INPUT) {
-      if (read_event_sensor_data(device, &ax, &ay, &az, &gx, &gy, &gz, &data_ts) != 0) {
+      if (read_event_sensor_data_v2(device, &ax, &ay, &az, &gx, &gy, &gz, &data_ts) != 0) {
         LOG_ERR("read_sensor_data failed");
         return -1;
       }

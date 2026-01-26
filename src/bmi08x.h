@@ -34,6 +34,7 @@ typedef struct {
   IMU_DEVICE_TYPE imu_device_type;
   const char* iio_device;
   const char* data_node;
+  const char* virtual_node;
   int imu_iic_bus;
   int acc_range;
   int acc_bandwidth;

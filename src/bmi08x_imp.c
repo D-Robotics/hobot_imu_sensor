@@ -35,8 +35,6 @@
          write_iic_register(fd, rregister, set_data);   \
          read_iic_register(fd, rregister, data); \
        } else { *data = *default_data; }  \
-       printf(#rregister": [addr: 0x%02x, set value: 0x%02x, read value: 0x%02x, default value: 0x%02x]\n", \
-         rregister, set_data, *data, *default_data);\
        if (set_data != *data) { \
        /*printf("[ERROR] " #rregister" register set failed! \n");*/ \
        } \
@@ -422,9 +420,6 @@ int bmi08x_device_open(Bmi08xDevice *device) {
            device->imu_iic_bus, address_acc, ACC_CONF_REGISTER);
   system(iic_bus_buffer);
 
-  LOG_INFO("excute: \n%s", iic_bus_buffer);
-  system(iic_bus_buffer);
-
   if (strncmp(device->data_node, "/sys/bus/iio", 12) == 0) {
     device->imu_device_type = IMU_DEVICE_TYPE_IIO;
   }
@@ -447,7 +442,7 @@ int bmi08x_device_open(Bmi08xDevice *device) {
     return -1;
   }
 
-  device->gscale = device->gyro_range / (pow(2, 16) * 2.0f - 1) * M_PI / 180.0;
+  device->gscale = device->gyro_range / (pow(2, 16) / 2.0f - 1) * M_PI / 180.0 ;
   device->ascale = device->acc_range / pow(2, 16) * 2.0f;
 
   LOG_INFO("bmi08x_device_open succeed!");

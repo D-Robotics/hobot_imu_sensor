@@ -18,6 +18,8 @@ from launch.actions import DeclareLaunchArgument, ExecuteProcess
 from launch_ros.actions import Node
 import os
 from launch.substitutions import LaunchConfiguration
+from launch.actions import ExecuteProcess, RegisterEventHandler
+from launch.event_handlers import OnProcessStart
 
 def declare_configurable_parameters(parameters):
     args = []
@@ -62,5 +64,11 @@ def generate_launch_description():
         arguments=['--ros-args', '--log-level', LaunchConfiguration('imu_log_level')]
     ))
 
+    node_name = "drobotics_imu_node"
+    kill_old_node = ExecuteProcess(
+        cmd=[f"pkill -f {node_name}"],
+        shell=True
+    )
+    launch.append(kill_old_node)
     return LaunchDescription(launch)
 

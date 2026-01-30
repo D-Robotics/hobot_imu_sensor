@@ -63,12 +63,5 @@ def generate_launch_description():
         parameters=[set_configurable_parameters(node_params)],
         arguments=['--ros-args', '--log-level', LaunchConfiguration('imu_log_level')]
     ))
-
-    node_name = "drobotics_imu_node"
-    kill_old_node = ExecuteProcess(
-        cmd=[f"pkill -f {node_name}"],
-        shell=True
-    )
-    launch.append(kill_old_node)
     return LaunchDescription(launch)
 

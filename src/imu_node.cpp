@@ -4,6 +4,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
+#include "blockque.h"
 #include "bmi08x.h"
 
 #define DECLARE_PARAMETER(name, default_value, p) \
@@ -29,6 +30,7 @@ private:
   void set_subscription_publisher();
   void set_imu_instance();
   void set_worker_thread();
+  void recv_func();
   void pub_func();
 
 private:
@@ -41,7 +43,8 @@ private:
   int acc_range = 12, gyro_range = 1000, acc_bandwidth = 40, gyro_bandwidth = 40, group_delay = 7;
   double gravity_ = 9.80665;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_ = nullptr;
-  std::shared_ptr<std::thread> pub_thread_;
+  std::shared_ptr<std::thread> pub_thread_, recv_thread_;
+  blockqueue<sensor_msgs::msg::Imu> frame_que_;
 };
 
 ImuComponent::ImuComponent(const rclcpp::NodeOptions &node_options, const std::string &node_name)
@@ -56,6 +59,10 @@ ImuComponent::~ImuComponent() {
   if (pub_thread_) {
     pub_thread_->join();
     pub_thread_ = nullptr;
+  }
+  if (recv_thread_) {
+    recv_thread_->join();
+    recv_thread_ = nullptr;
   }
   bmi08x_device_close(&bmi08x_device_);
 }
@@ -99,23 +106,32 @@ void ImuComponent::set_imu_instance() {
 
 void ImuComponent::set_worker_thread() {
   pub_thread_ = std::make_shared<std::thread>([this] { pub_func(); });
+  recv_thread_ = std::make_shared<std::thread>([this] { recv_func(); });
 }
 
 void ImuComponent::pub_func() {
   int ret = 0;
+  while(rclcpp::ok()) {
+    sensor_msgs::msg::Imu imu_msg;
+    if (frame_que_.get(imu_msg)) {
+      imu_pub_->publish(imu_msg);
+    }
+  }
+}
+
+void ImuComponent::recv_func() {
+  int ret = 0;
   int64_t diff, min_diff = INT64_MAX, max_diff = INT64_MIN;
   uint64_t lost_count = 0, disorder_count = 0, repeated_count = 0;
   Bmi08xFrame current_frame, last_frame;
-  sensor_msgs::msg::Imu imu_msg;
-  imu_msg.orientation.x = 0;
-  imu_msg.orientation.y = 0;
-  imu_msg.orientation.z = 0;
-  imu_msg.orientation.w = 1;
-  imu_msg.header.frame_id = imu_frame_id_;
-
   last_frame.sys_timestamp = 0;
-
   while(rclcpp::ok()) {
+    sensor_msgs::msg::Imu imu_msg;
+    imu_msg.orientation.x = 0;
+    imu_msg.orientation.y = 0;
+    imu_msg.orientation.z = 0;
+    imu_msg.orientation.w = 1;
+    imu_msg.header.frame_id = imu_frame_id_;
     ret = bmi08x_get_frame(&bmi08x_device_, &current_frame);
     std::cout << std::flush;
     if (ret != 0) {
@@ -131,7 +147,7 @@ void ImuComponent::pub_func() {
     imu_msg.angular_velocity.x = current_frame.gx;
     imu_msg.angular_velocity.y = current_frame.gy;
     imu_msg.angular_velocity.z = current_frame.gz;
-    imu_pub_->publish(imu_msg);
+    frame_que_.put(imu_msg);
     diff = current_frame.sys_timestamp - last_frame.sys_timestamp;
     if (last_frame.sys_timestamp != 0 && diff * 1e-9 > 0.003) {
       lost_count++;

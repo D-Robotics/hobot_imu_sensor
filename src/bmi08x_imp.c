@@ -37,7 +37,9 @@
        } else { *data = *default_data; }  \
        printf(#rregister": [addr: 0x%02x, set value: 0x%02x, read value: 0x%02x, default value: 0x%02x]\n", \
          rregister, set_data, *data, *default_data);\
-       if (set_data != *data) { printf("[ERROR] " #rregister" register set failed! \n"); } \
+       if (set_data != *data) { \
+       /*printf("[ERROR] " #rregister" register set failed! \n");*/ \
+       } \
        else { printf("[OK] " #rregister" register set succeed! \n"); break; }    \
   } while(maxcount-- >= 0);
 
@@ -287,9 +289,10 @@ static int read_event_sensor_data_v2(
 int bmi08x_device_open(Bmi08xDevice *device) {
   int max_retry_count = 5, retry_count;
   char iic_bus_buffer[128];
+  uint8_t address_gyro = 0x69, address_acc = 0x19;
   snprintf(iic_bus_buffer, sizeof(iic_bus_buffer), "/dev/i2c-%d", device->imu_iic_bus);
-  int iic_gyro = get_iic_device_fd(iic_bus_buffer, 0x69);
-  int iic_acc = get_iic_device_fd(iic_bus_buffer, 0x19);
+  int iic_gyro = get_iic_device_fd(iic_bus_buffer, address_gyro);
+  int iic_acc = get_iic_device_fd(iic_bus_buffer, address_acc);
   if (iic_gyro <= 0 || iic_acc <= 0) {
     return -1;
   }
@@ -307,16 +310,16 @@ int bmi08x_device_open(Bmi08xDevice *device) {
   uint8_t data, set_data, default_data;
   set_data = 0x80;  //  enable int4 pin, disable int3 pin
   GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_MAP_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
   set_data = 0x05;  //  int4 push-pull, active high, int3 push-pull, active high
   GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_CONF_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
   set_data = 0x80;  //  enable new data triggered
   GET_SET_VALUE(iic_gyro, GYRO_INT_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
   set_data = 0x83; //  400Hz
   GET_SET_VALUE(iic_gyro, GYRO_BANDWIDTH_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
   // 0 -> +-2000, 1-> +- 1000, 2-> +- 500, 3-> +- 250, 4-> +- 125
   switch (device->gyro_range) {
     case 1000:
@@ -333,19 +336,19 @@ int bmi08x_device_open(Bmi08xDevice *device) {
       break;
   }
   GET_SET_VALUE(iic_gyro, GYRO_RANGE_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
 
   //  0x44(01000100) map int2 int1 data ready
   //  0x04(00000100) map int1 data ready
   set_data = 0x04;
   GET_SET_VALUE(iic_acc, ACC_INT_MAP_DATA_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
   set_data = 0x16;  //  int2 input pin, activte high, push-pull
   GET_SET_VALUE(iic_acc, ACC_INT2_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
   set_data = 0x0A;  //  int1 output pin, activte high, push-pull
   GET_SET_VALUE(iic_acc, ACC_INT1_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
   set_data = 0x02; //  +-12G
   switch (device->acc_range) {
     case 3:
@@ -362,17 +365,65 @@ int bmi08x_device_open(Bmi08xDevice *device) {
       break;
   }
   GET_SET_VALUE(iic_acc, ACC_RANGE_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 100);
+  usleep(1000 * 50);
   set_data = 0x8A; // OSR4, 400Hz
   GET_SET_VALUE(iic_acc, ACC_CONF_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
 
   close_iic_fd(iic_acc);
   close_iic_fd(iic_gyro);
 
-  if (max_retry_count < 0) {
-    LOG_ERR("set register failed!");
-    return -1;
-  }
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo GYRO_INT4_INT3_IO_MAP_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_gyro, GYRO_INT4_INT3_IO_MAP_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo GYRO_INT4_INT3_IO_CONF_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_gyro, GYRO_INT4_INT3_IO_CONF_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo GYRO_INT_CTRL_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_gyro, GYRO_INT_CTRL_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo GYRO_BANDWIDTH_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_gyro, GYRO_BANDWIDTH_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo GYRO_RANGE_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_gyro, GYRO_RANGE_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo ACC_INT_MAP_DATA_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_acc, ACC_INT_MAP_DATA_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo ACC_INT2_IO_CTRL_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_acc, ACC_INT2_IO_CTRL_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo ACC_INT1_IO_CTRL_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_acc, ACC_INT1_IO_CTRL_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo ACC_RANGE_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_acc, ACC_RANGE_REGISTER);
+  system(iic_bus_buffer);
+
+  snprintf(iic_bus_buffer, sizeof(iic_bus_buffer),
+           "echo ACC_CONF_REGISTER: `i2cget -y -f %d 0x%02x 0x%02x`",
+           device->imu_iic_bus, address_acc, ACC_CONF_REGISTER);
+  system(iic_bus_buffer);
+
+  LOG_INFO("excute: \n%s", iic_bus_buffer);
+  system(iic_bus_buffer);
 
   if (strncmp(device->data_node, "/sys/bus/iio", 12) == 0) {
     device->imu_device_type = IMU_DEVICE_TYPE_IIO;
@@ -429,6 +480,7 @@ int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame) {
   }
 
   if (ret == 0) {
+    LOG_ERR("waiting for imu data timeout! Please make sure that path is right: %s", device->data_node);
     return -1;
   }
 

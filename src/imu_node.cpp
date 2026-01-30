@@ -34,8 +34,9 @@ private:
 private:
   Bmi08xDevice bmi08x_device_;
 private:
-  std::string imu_pub_topic_ = "~/bmi08x_imu", iio_device_ = IMU_IIO_DEV_PATH,
+  std::string imu_pub_topic_ = "bmi08x_imu", iio_device_ = IMU_IIO_DEV_PATH,
   data_node_ = IMU_INPUT_DEV_PATH, virtual_node_ = "/sys/devices/virtual/input/input1/";
+  std::string imu_frame_id_ = "imu_bmi088";
   int iic_bus_ = 5;
   int acc_range = 12, gyro_range = 1000, acc_bandwidth = 40, gyro_bandwidth = 40, group_delay = 7;
   double gravity_ = 9.80665;
@@ -71,6 +72,7 @@ void ImuComponent::set_node_params() {
   DECLARE_PARAMETER("imu_gyro_bandwidth", gyro_bandwidth, gyro_bandwidth);
   DECLARE_PARAMETER("imu_group_delay", group_delay, group_delay);
   DECLARE_PARAMETER("imu_gravity", gravity_, gravity_);
+  DECLARE_PARAMETER("imu_frame_id", imu_frame_id_, imu_frame_id_);
 }
 
 void ImuComponent::set_subscription_publisher() {
@@ -109,7 +111,7 @@ void ImuComponent::pub_func() {
   imu_msg.orientation.y = 0;
   imu_msg.orientation.z = 0;
   imu_msg.orientation.w = 1;
-  imu_msg.header.frame_id = "imu_link";
+  imu_msg.header.frame_id = imu_frame_id_;
 
   last_frame.sys_timestamp = 0;
 
@@ -120,14 +122,15 @@ void ImuComponent::pub_func() {
       RCLCPP_FATAL(this->get_logger(), "bmi08x_get_frame failed");
       return;
     }
+    current_frame.sys_timestamp -= group_delay * 1e6;
     imu_msg.header.stamp.set__sec(current_frame.sys_timestamp / 1e9);
     imu_msg.header.stamp.set__nanosec(current_frame.sys_timestamp - imu_msg.header.stamp.sec * 1e9);
     imu_msg.linear_acceleration.x = current_frame.ax * gravity_;
     imu_msg.linear_acceleration.y = current_frame.ay * gravity_;
     imu_msg.linear_acceleration.z = current_frame.az * gravity_;
-    imu_msg.angular_velocity.x = current_frame.gx * gravity_;
-    imu_msg.angular_velocity.y = current_frame.gy * gravity_;
-    imu_msg.angular_velocity.z = current_frame.gz * gravity_;
+    imu_msg.angular_velocity.x = current_frame.gx;
+    imu_msg.angular_velocity.y = current_frame.gy;
+    imu_msg.angular_velocity.z = current_frame.gz;
     imu_pub_->publish(imu_msg);
     diff = current_frame.sys_timestamp - last_frame.sys_timestamp;
     if (last_frame.sys_timestamp != 0 && diff * 1e-9 > 0.003) {

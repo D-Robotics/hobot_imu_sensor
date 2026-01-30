@@ -51,7 +51,8 @@ def generate_launch_description():
         {'name':'imu_gyro_range', 'default_value': 1000, 'description': 'imu_gyro_range'},
         {'name':'imu_gyro_bandwidth', 'default_value': 47, 'description': 'imu_gyro_bandwidth'},
         {'name':'imu_group_delay', 'default_value': 7, 'description': 'imu_group_delay'},
-        {'name':'imu_gravity', 'default_value': 9.80665, 'description': 'imu_gravity'},
+        {'name':'imu_gravity', 'default_value': 9.79494, 'description': 'imu_gravity'},
+        {'name':'imu_frame_id', 'default_value': "imu_bmi088", 'description': 'imu_frame_id'},
         {'name':'imu_log_level', 'default_value': 'warn', 'description': 'imu_log_level'},
     ]
 

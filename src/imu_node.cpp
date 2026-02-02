@@ -42,6 +42,7 @@ private:
   int iic_bus_ = 5;
   int acc_range = 12, gyro_range = 1000, acc_bandwidth = 40, gyro_bandwidth = 40, group_delay = 7;
   double gravity_ = 9.80665;
+  bool imu_adjust_interrupt_ = false, imu_use_pool_ = false;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_ = nullptr;
   std::shared_ptr<std::thread> pub_thread_, recv_thread_;
   blockqueue<sensor_msgs::msg::Imu> frame_que_;
@@ -80,6 +81,8 @@ void ImuComponent::set_node_params() {
   DECLARE_PARAMETER("imu_group_delay", group_delay, group_delay);
   DECLARE_PARAMETER("imu_gravity", gravity_, gravity_);
   DECLARE_PARAMETER("imu_frame_id", imu_frame_id_, imu_frame_id_);
+  DECLARE_PARAMETER("imu_adjust_interrupt", imu_adjust_interrupt_, imu_adjust_interrupt_);
+  DECLARE_PARAMETER("imu_use_pool", imu_use_pool_, imu_use_pool_);
 }
 
 void ImuComponent::set_subscription_publisher() {
@@ -96,6 +99,7 @@ void ImuComponent::set_imu_instance() {
   bmi08x_device_.acc_bandwidth = acc_bandwidth;
   bmi08x_device_.gyro_range = gyro_range;
   bmi08x_device_.gyro_bandwidth = gyro_bandwidth;
+  bmi08x_device_.io_interrupt = imu_adjust_interrupt_;
   ret = bmi08x_device_open(&bmi08x_device_);
   std::cout << std::flush;
   if (ret != 0) {
@@ -132,7 +136,7 @@ void ImuComponent::recv_func() {
     imu_msg.orientation.z = 0;
     imu_msg.orientation.w = 1;
     imu_msg.header.frame_id = imu_frame_id_;
-    ret = bmi08x_get_frame(&bmi08x_device_, &current_frame);
+    ret = bmi08x_get_frame(&bmi08x_device_, &current_frame, imu_use_pool_);
     std::cout << std::flush;
     if (ret != 0) {
       RCLCPP_FATAL(this->get_logger(), "bmi08x_get_frame failed");

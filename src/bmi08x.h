@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,7 @@ typedef struct {
   int acc_bandwidth;
   int gyro_range;
   int gyro_bandwidth;
+  bool io_interrupt;
   /* configuration */
 
   /* info for get imu frame */
@@ -57,7 +59,7 @@ typedef struct {
 } Bmi08xFrame;
 
 int bmi08x_device_open(Bmi08xDevice *device);
-int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame);
+int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame, bool use_poll);
 int bmi08x_device_close(Bmi08xDevice *device);
 
 #ifdef __cplusplus

@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/select.h>
+#include <sys/poll.h>
 #include <stdint.h>
 #include <time.h>
 #include <linux/input.h>
@@ -306,15 +306,17 @@ int bmi08x_device_open(Bmi08xDevice *device) {
   usleep(200 * 1000);
 
   uint8_t data, set_data, default_data;
-  set_data = 0x80;  //  enable int4 pin, disable int3 pin
-  GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_MAP_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 50);
-  set_data = 0x05;  //  int4 push-pull, active high, int3 push-pull, active high
-  GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_CONF_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 50);
-  set_data = 0x80;  //  enable new data triggered
-  GET_SET_VALUE(iic_gyro, GYRO_INT_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 50);
+  if (device->io_interrupt) {
+    set_data = 0x80;  //  enable int4 pin, disable int3 pin
+    GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_MAP_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+    usleep(1000 * 50);
+    set_data = 0x05;  //  int4 push-pull, active high, int3 push-pull, active high
+    GET_SET_VALUE(iic_gyro, GYRO_INT4_INT3_IO_CONF_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+    usleep(1000 * 50);
+    set_data = 0x80;  //  enable new data triggered
+    GET_SET_VALUE(iic_gyro, GYRO_INT_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+    usleep(1000 * 50);
+  }
   set_data = 0x83; //  400Hz
   GET_SET_VALUE(iic_gyro, GYRO_BANDWIDTH_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 50);
@@ -336,17 +338,19 @@ int bmi08x_device_open(Bmi08xDevice *device) {
   GET_SET_VALUE(iic_gyro, GYRO_RANGE_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
   usleep(1000 * 50);
 
-  //  0x44(01000100) map int2 int1 data ready
-  //  0x04(00000100) map int1 data ready
-  set_data = 0x04;
-  GET_SET_VALUE(iic_acc, ACC_INT_MAP_DATA_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 50);
-  set_data = 0x16;  //  int2 input pin, activte high, push-pull
-  GET_SET_VALUE(iic_acc, ACC_INT2_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 50);
-  set_data = 0x0A;  //  int1 output pin, activte high, push-pull
-  GET_SET_VALUE(iic_acc, ACC_INT1_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
-  usleep(1000 * 50);
+  if (device->io_interrupt) {
+    //  0x44(01000100) map int2 int1 data ready
+    //  0x04(00000100) map int1 data ready
+    set_data = 0x04;
+    GET_SET_VALUE(iic_acc, ACC_INT_MAP_DATA_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+    usleep(1000 * 50);
+    set_data = 0x16;  //  int2 input pin, activte high, push-pull
+    GET_SET_VALUE(iic_acc, ACC_INT2_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+    usleep(1000 * 50);
+    set_data = 0x0A;  //  int1 output pin, activte high, push-pull
+    GET_SET_VALUE(iic_acc, ACC_INT1_IO_CTRL_REGISTER, &data, set_data, &default_data, retry_count, max_retry_count);
+    usleep(1000 * 50);
+  }
   set_data = 0x02; //  +-12G
   switch (device->acc_range) {
     case 3:
@@ -449,57 +453,49 @@ int bmi08x_device_open(Bmi08xDevice *device) {
   return 0;
 }
 
-int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame) {
+int bmi08x_get_frame(Bmi08xDevice *device, Bmi08xFrame *frame, bool use_poll) {
   int ret;
-  fd_set readfds;
-  struct timeval timeout;
   int16_t ax = 0, ay = 0, az = 0, gx = 0, gy = 0, gz = 0;
   uint64_t data_ts = 0;
-  int event_fd;
-
   if (device == NULL || frame == NULL) {
     LOG_ERR("Bmi08xDevice or Bmi08xFrame is null!\n");
     return -1;
   }
-
-  FD_ZERO(&readfds);
-  FD_SET(device->event_fd, &readfds);
-  timeout.tv_sec = 1;
-  timeout.tv_usec = 0;
-
-  event_fd = device->event_fd;
-  ret = select(event_fd + 1, &readfds, NULL, NULL, &timeout);
-  if (ret < 0) {
-    LOG_ERR("select failed, ret: %d, errno: %s", ret, strerror(errno));
-    return -1;
-  }
-
-  if (ret == 0) {
-    LOG_ERR("waiting for imu data timeout! Please make sure that path is right: %s", device->data_node);
-    return -1;
-  }
-
-  if (FD_ISSET(event_fd, &readfds)) {
-    if (device->imu_device_type == IMU_DEVICE_TYPE_IIO) {
-      if (read_iio_sensor_data(device, &ax, &ay, &az, &gx, &gy, &gz, &data_ts) != 0) {
-        LOG_ERR("read_sensor_data failed");
-        return -1;
-      }
-    } else if (device->imu_device_type == IMU_DEVICE_TYPE_INPUT) {
-      if (read_event_sensor_data_v2(device, &ax, &ay, &az, &gx, &gy, &gz, &data_ts) != 0) {
-        LOG_ERR("read_sensor_data failed");
-        return -1;
-      }
+  if (use_poll) {
+    struct pollfd pfd = {
+        .fd = device->event_fd,
+        .events = POLLIN,
+    };
+    ret = poll(&pfd, 1, 1000);
+    if (ret < 0) {
+      LOG_ERR("select failed, ret: %d, errno: %s", ret, strerror(errno));
+      return -1;
     }
-    frame->sys_timestamp = data_ts;
-    frame->ax = device->ascale * ax;
-    frame->ay = device->ascale * ay;
-    frame->az = device->ascale * az;
-    frame->gx = device->gscale * gx;
-    frame->gy = device->gscale * gy;
-    frame->gz = device->gscale * gz;
-    //  LOG_INFO("DataTS: %lu | ACC(%d, %d, %d) | GYRO(%d, %d, %d)\n", data_ts, ax, ay, az,gx, gy, gz);
+
+    if (ret == 0) {
+      LOG_ERR("waiting for imu data timeout! Please make sure that path is right: %s", device->data_node);
+      return -1;
+    }
   }
+  if (device->imu_device_type == IMU_DEVICE_TYPE_IIO) {
+    if (read_iio_sensor_data(device, &ax, &ay, &az, &gx, &gy, &gz, &data_ts) != 0) {
+      LOG_ERR("read_sensor_data failed");
+      return -1;
+    }
+  } else if (device->imu_device_type == IMU_DEVICE_TYPE_INPUT) {
+    if (read_event_sensor_data_v2(device, &ax, &ay, &az, &gx, &gy, &gz, &data_ts) != 0) {
+      LOG_ERR("read_sensor_data failed");
+      return -1;
+    }
+  }
+  frame->sys_timestamp = data_ts;
+  frame->ax = device->ascale * ax;
+  frame->ay = device->ascale * ay;
+  frame->az = device->ascale * az;
+  frame->gx = device->gscale * gx;
+  frame->gy = device->gscale * gy;
+  frame->gz = device->gscale * gz;
+  //  LOG_INFO("DataTS: %lu | ACC(%d, %d, %d) | GYRO(%d, %d, %d)\n", data_ts, ax, ay, az,gx, gy, gz);
   return 0;
 }
 

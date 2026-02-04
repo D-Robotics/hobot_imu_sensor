@@ -199,13 +199,14 @@ void ImuComponent::pub_func() {
 void ImuComponent::recv_func() {
   int ret = 0;
   Bmi08xFrame current_frame;
-  while(rclcpp::ok()) {
+  while (rclcpp::ok()) {
     ret = bmi08x_get_frame(&bmi08x_device_, &current_frame, imu_use_pool_);
     std::cout << std::flush;
     if (ret != 0) {
       RCLCPP_FATAL(this->get_logger(), "bmi08x_get_frame failed");
       return;
     }
+    frame_que_.put(current_frame);
   }
 }
 

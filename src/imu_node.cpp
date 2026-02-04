@@ -4,6 +4,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
+#include <fstream>
 #include "blockque.h"
 #include "bmi08x.h"
 
@@ -45,7 +46,7 @@ private:
   bool imu_adjust_interrupt_ = false, imu_use_pool_ = false;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_ = nullptr;
   std::shared_ptr<std::thread> pub_thread_, recv_thread_;
-  blockqueue<sensor_msgs::msg::Imu> frame_que_;
+  blockqueue<Bmi08xFrame> frame_que_;
 };
 
 ImuComponent::ImuComponent(const rclcpp::NodeOptions &node_options, const std::string &node_name)
@@ -115,74 +116,96 @@ void ImuComponent::set_worker_thread() {
 
 void ImuComponent::pub_func() {
   int ret = 0;
-  while(rclcpp::ok()) {
-    sensor_msgs::msg::Imu imu_msg;
-    if (frame_que_.get(imu_msg)) {
+  int64_t diff, min_diff = INT64_MAX, max_diff = INT64_MIN;
+  uint64_t lost_count = 0, disorder_count = 0, repeated_count = 0;
+  Bmi08xFrame current_frame, last_frame;
+  last_frame.sys_timestamp = 0;
+  sensor_msgs::msg::Imu imu_msg;
+  FILE *file = fopen("imu_error.log", "w");
+  if (file == nullptr) {
+    RCLCPP_FATAL(this->get_logger(), "Can not create imu_error.log");
+  }
+  imu_msg.orientation.x = 0;
+  imu_msg.orientation.y = 0;
+  imu_msg.orientation.z = 0;
+  imu_msg.orientation.w = 1;
+  imu_msg.header.frame_id = imu_frame_id_;
+
+  while (rclcpp::ok()) {
+    if (frame_que_.get(current_frame)) {
+      current_frame.sys_timestamp -= group_delay * 1e6;
+      imu_msg.header.stamp.set__sec(current_frame.sys_timestamp / 1e9);
+      imu_msg.header.stamp.set__nanosec(current_frame.sys_timestamp - imu_msg.header.stamp.sec * 1e9);
+      imu_msg.linear_acceleration.x = current_frame.ax * gravity_;
+      imu_msg.linear_acceleration.y = current_frame.ay * gravity_;
+      imu_msg.linear_acceleration.z = current_frame.az * gravity_;
+      imu_msg.angular_velocity.x = current_frame.gx;
+      imu_msg.angular_velocity.y = current_frame.gy;
+      imu_msg.angular_velocity.z = current_frame.gz;
       imu_pub_->publish(imu_msg);
+      diff = current_frame.sys_timestamp - last_frame.sys_timestamp;
+      if (last_frame.sys_timestamp != 0 && diff * 1e-9 > 0.003) {
+        lost_count++;
+        RCLCPP_ERROR(get_logger(), "Lost imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                                   "lost_count: %lu, disorder_count: %lu, repeated_count: %lu\n",
+                     last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                     lost_count, disorder_count, repeated_count);
+        if (file) {
+          fprintf(file, "Lost imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                        "lost_count: %lu, disorder_count: %lu, repeated_count: %lu\n",
+                  last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                  lost_count, disorder_count, repeated_count);
+        }
+      }
+      if (diff < 0) {
+        disorder_count++;
+        RCLCPP_ERROR(get_logger(), "Disorder imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                                   "lost_count: %lu, disorder_count: %lu, repeated_count: %lu\n",
+                     last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                     lost_count, disorder_count, repeated_count);
+        if (file) {
+          fprintf(file, "Disorder imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                        "lost_count: %lu, disorder_count: %lu, repeated_count: %lu\n",
+                  last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                  lost_count, disorder_count, repeated_count);
+        }
+      }
+      if (diff == 0) {
+        repeated_count++;
+        RCLCPP_ERROR(get_logger(), "Repeated imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                                   "lost_count: %lu, disorder_count: %lu, repeated_count: %lu\n",
+                     last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                     lost_count, disorder_count, repeated_count);
+        if (file) {
+          fprintf(file, "Repeated imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
+                        "lost_count: %lu, disorder_count: %lu, repeated_count: %lu\n",
+                  last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
+                  lost_count, disorder_count, repeated_count);
+        }
+      }
+      if (diff < min_diff) min_diff = diff;
+      if (diff > max_diff) max_diff = diff;
+
+      RCLCPP_INFO(get_logger(),
+                  "DataTS: %lu | ACC(%f, %f, %f) | GYRO(%f, %f, %f) | DIFF(%f, %f, %f) | LOST(lost: %u, disorder: %u, repeated: %u)\n",
+                  current_frame.sys_timestamp, current_frame.ax, current_frame.ay, current_frame.az,
+                  current_frame.gx, current_frame.gy, current_frame.gz,
+                  diff * 1e-9, min_diff * 1e-9, max_diff * 1e-9, lost_count, disorder_count, repeated_count);
+      last_frame = current_frame;
     }
   }
 }
 
 void ImuComponent::recv_func() {
   int ret = 0;
-  int64_t diff, min_diff = INT64_MAX, max_diff = INT64_MIN;
-  uint64_t lost_count = 0, disorder_count = 0, repeated_count = 0;
-  Bmi08xFrame current_frame, last_frame;
-  last_frame.sys_timestamp = 0;
+  Bmi08xFrame current_frame;
   while(rclcpp::ok()) {
-    sensor_msgs::msg::Imu imu_msg;
-    imu_msg.orientation.x = 0;
-    imu_msg.orientation.y = 0;
-    imu_msg.orientation.z = 0;
-    imu_msg.orientation.w = 1;
-    imu_msg.header.frame_id = imu_frame_id_;
     ret = bmi08x_get_frame(&bmi08x_device_, &current_frame, imu_use_pool_);
     std::cout << std::flush;
     if (ret != 0) {
       RCLCPP_FATAL(this->get_logger(), "bmi08x_get_frame failed");
       return;
     }
-    current_frame.sys_timestamp -= group_delay * 1e6;
-    imu_msg.header.stamp.set__sec(current_frame.sys_timestamp / 1e9);
-    imu_msg.header.stamp.set__nanosec(current_frame.sys_timestamp - imu_msg.header.stamp.sec * 1e9);
-    imu_msg.linear_acceleration.x = current_frame.ax * gravity_;
-    imu_msg.linear_acceleration.y = current_frame.ay * gravity_;
-    imu_msg.linear_acceleration.z = current_frame.az * gravity_;
-    imu_msg.angular_velocity.x = current_frame.gx;
-    imu_msg.angular_velocity.y = current_frame.gy;
-    imu_msg.angular_velocity.z = current_frame.gz;
-    frame_que_.put(imu_msg);
-    diff = current_frame.sys_timestamp - last_frame.sys_timestamp;
-    if (last_frame.sys_timestamp != 0 && diff * 1e-9 > 0.003) {
-      lost_count++;
-      RCLCPP_ERROR(get_logger(), "Lost imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
-                                 "lost_count: %u, disorder_count: %u, repeated_count: %u\n",
-                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
-                   lost_count, disorder_count, repeated_count);
-    }
-    if (diff < 0) {
-      disorder_count++;
-      RCLCPP_ERROR(get_logger(), "Disorder imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
-                                 "lost_count: %u, disorder_count: %u, repeated_count: %u\n",
-                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
-                   lost_count, disorder_count, repeated_count);
-    }
-    if (diff == 0) {
-      repeated_count++;
-      RCLCPP_ERROR(get_logger(), "Repeated imu data!, last ts: %fs, current ts: %fs, diff: %fs,"
-                                 "lost_count: %u, disorder_count: %u, repeated_count: %u\n",
-                   last_frame.sys_timestamp * 1e-9, current_frame.sys_timestamp * 1e-9, diff * 1e-9,
-                   lost_count, disorder_count, repeated_count);
-    }
-    if (diff < min_diff) min_diff = diff;
-    if (diff > max_diff) max_diff = diff;
-
-    RCLCPP_INFO(get_logger(),
-                "DataTS: %lu | ACC(%f, %f, %f) | GYRO(%f, %f, %f) | DIFF(%f, %f, %f) | LOST(lost: %u, disorder: %u, repeated: %u)\n",
-                current_frame.sys_timestamp, current_frame.ax, current_frame.ay, current_frame.az,
-                current_frame.gx, current_frame.gy, current_frame.gz,
-                diff * 1e-9, min_diff * 1e-9, max_diff * 1e-9, lost_count, disorder_count, repeated_count);
-    last_frame = current_frame;
   }
 }
 

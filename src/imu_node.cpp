@@ -41,8 +41,8 @@ private:
   data_node_ = IMU_INPUT_DEV_PATH, virtual_node_ = "/sys/devices/virtual/input/input1/";
   std::string imu_frame_id_ = "imu_bmi088";
   int iic_bus_ = 5;
-  int acc_range = 12, gyro_range = 1000, acc_bandwidth = 40, gyro_bandwidth = 40, group_delay = 7;
-  double gravity_ = 9.80665;
+  int acc_range = 12, gyro_range = 1000, acc_bandwidth = 47, gyro_bandwidth = 47, group_delay = 7;
+  double gravity_ = 9.79494;
   bool imu_adjust_interrupt_ = false, imu_use_pool_ = false;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_ = nullptr;
   std::shared_ptr<std::thread> pub_thread_, recv_thread_;
@@ -87,7 +87,11 @@ void ImuComponent::set_node_params() {
 }
 
 void ImuComponent::set_subscription_publisher() {
-  imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>(imu_pub_topic_, 400);
+  rclcpp::QoS qos((rclcpp::KeepAll()));
+  qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+  qos.durability(RMW_QOS_POLICY_DURABILITY_VOLATILE);
+  qos.history(RMW_QOS_POLICY_HISTORY_KEEP_ALL);
+  imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>(imu_pub_topic_, qos);
 }
 
 void ImuComponent::set_imu_instance() {

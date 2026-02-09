@@ -18,7 +18,7 @@ extern "C" {
 #define IIO_GET_EVENT_FD_IOCTL _IOR('i', 0x90, int)
 #define IMU_IIO_DEV_PATH     "/dev/iio:device1"
 #define IMU_DATA_NODE        "/sys/bus/iio/devices/iio:device1/bmi088_latest_data"
-#define IMU_INPUT_DEV_PATH "/dev/input/event1"
+#define IMU_INPUT_DEV_PATH "/dev/input/event3"
 
 typedef enum {
   IMU_DEVICE_TYPE_INPUT,

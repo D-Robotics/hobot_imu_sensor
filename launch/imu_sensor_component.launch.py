@@ -53,7 +53,7 @@ def generate_launch_description():
         {'name':'imu_group_delay', 'default_value': 7, 'description': 'imu_group_delay'},
         {'name':'imu_gravity', 'default_value': 9.79494, 'description': 'imu_gravity'},
         {'name':'imu_frame_id', 'default_value': "imu_bmi088", 'description': 'imu_frame_id'},
-        {'name':'imu_adjust_interrupt', 'default_value': False, 'description': 'imu_adjust_interrupt'},
+        {'name':'imu_adjust_interrupt', 'default_value': True, 'description': 'imu_adjust_interrupt'},
         {'name':'imu_use_pool', 'default_value': False, 'description': 'imu_use_pool'},
         {'name':'imu_log_level', 'default_value': 'warn', 'description': 'imu_log_level'},
     ]

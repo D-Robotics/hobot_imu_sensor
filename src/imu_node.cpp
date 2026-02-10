@@ -43,7 +43,7 @@ private:
   int iic_bus_ = 5;
   int acc_range = 12, gyro_range = 1000, acc_bandwidth = 47, gyro_bandwidth = 47, group_delay = 7;
   double gravity_ = 9.79494;
-  bool imu_adjust_interrupt_ = false, imu_use_pool_ = false;
+  bool imu_adjust_interrupt_ = true, imu_use_pool_ = false;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_ = nullptr;
   std::shared_ptr<std::thread> pub_thread_, recv_thread_;
   blockqueue<Bmi08xFrame> frame_que_;

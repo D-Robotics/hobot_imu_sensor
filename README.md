@@ -1,125 +1,62 @@
-English| [简体中文](./README_cn.md)
-
 Getting Started with IMU Sensor Node
-
 # Intro
 The imu_sensor package is used to publish sensor_msgs::msg::imu ROS2 topic, which includes angular velocity and linear acceleration of object motion with fine-tuned timestamps.
 This article details how to compile and use the imu_sensor package.
 
+The sensors must be securely fastened to prevent any relative movement which causes extrinsic parameters changes during operation.
+As shown in the figure below, the sensors are mounted securely to a rigid mounting structure.
+![](./pic/mount.jpg)
+It's need use these pillar to install the IMU sensor as shown below.
+![](./pic/pillar.jpg)
 
 # Build
-
 ## Dependency
-
 dependency libraries：
 ros2 package：
 - sensor_msgs
 - rclcpp
-
 ## Developing Environment
-
 - Language: C++
-- Platform: X3
-- Operating System: Ubuntu 20.04
-- Compiling Toolchain: Linux GCC 9.3.0/Linaro GCC 9.3.0
+- Platform: X5
+- Operating System: Ubuntu 22.04
+- Compiling Toolchain: Linux GCC 11.2.0/Linaro GCC 11.2.0
 
-## package Description
-After the compilation of the imu_sensor package, the config and launch directories and .so library are respectively installed in the
-install/lib/imu_sensor or install/share/imu_sensor directory.
-
-## Compiling
-The package supports compilation on the X3 board and cross-compilation on a PC.
-### Compiling on X3 in Ubuntu
-1. Confirm the compilation environment
-- X3 with Ubuntu installed
-- Source the TogetheROS bash file `source $TogetheROS_PATH/setup.bash` where $TogetheROS_PATH is the installation directory of TogetheROS
-- Ensure colcon is installed, otherwise: `pip install -U colcon-common-extensions`
-
-2. Compilation:
-   Execute `colcon build --packages-select imu_sensor`.
-
-### Cross compiling on PC in docker
-
-1. Confirm the compilation environment
-- Refer to this document for installing the compilation environment
- (https://github.com/D-Robotics/robot_dev_config/blob/develop/README.md)
-
-2. Compilation
-
-- Compilation command: 
-
+## X5 environment configuration
+ssh into X5, and set the interface of IMU.
 ```bash
-export TARGET_ARCH=aarch64
-export TARGET_TRIPLE=aarch64-linux-gnu
-export CROSS_COMPILE=/usr/bin/$TARGET_TRIPLE-
-
-colcon build --packages-select mipi_cam \
-   --merge-install \
-   --cmake-force-configure \
-   --cmake-args \
-   --no-warn-unused-cli \
-   -DCMAKE_TOOLCHAIN_FILE=`pwd`/robot_dev_config/aarch64_toolchainfile.cmake
+srpi-config
 ```
+After you input srpi-config, the terminal will show the configuration.
+1. press '↓' of keyboard to select option 3 'Interface Options' and press Enter
+   ![](./pic/step1.jpg)
+2. press '↓' of keyboard to select option I6 'IMU' and press enter
+   ![](./pic/step2.jpg)
+3. press '↓' of keyboard to select option 'BMI088-I2C-Interface' and press Enter
+   ![](./pic/step3.jpg)
+4. press '→' of keyboard to select option '\<Finish\>' and press Enter
+   ![](./pic/step4.jpg)
+5. reboot now!
+   ![](./pic/step5.jpg)
 
-# Usage
-## X3 Ubuntu
+## Code dowaloading
+```bash
+mkdir -p ~/tros_nav/src
+cd tros_nav/src
+git clone -b feat-rdk-imu-V2 https://github.com/D-Robotics/hobot_imu_sensor.git
+```
+## Compiling
+```bash
+cd ~/tros_nav
+colcon build
+```
+## Execution
+```bash
+cd ~/tros_nav
 
-Launched by 'ros2 run':
+# launch imu and stereo camera
+source /opt/tros/humble/setup.bash
+source install/setup.bash
 
+ros2 launch imu_sensor imu_sensor.launch.py imu_gravity:=9.795 imu_log_level:=warn
 ```
-export COLCON_CURRENT_PREFIX=$YOUR_TROS_PATH
-source $COLCON_CURRENT_PREFIX/setup.bash
-ros2 run imu_sensor imu_sensor --ros-args -p config_file_path:=./install/lib/imu_sensor/config/bmi088.yaml
-```
-
-Launched by 'ros2 launch':
-
-```
-export COLCON_CURRENT_PREFIX=$YOUR_TROS_PATH
-source $COLCON_CURRENT_PREFIX/setup.bash
-ros2 launch imu_sensor imu_sensor.launch.py
-```
-
-Where config_file_path is the configuration file, and the meanings of the fields i2c_bus, data range, and bandwidth in the configuration file are as follows.
-```yaml
-name: "bmi088"
-# i2c_bus number
-i2c_bus: 1
-# Accelerometer range, unit 'g'
-acc_range: 12
-# Gyroscope range, unit 'deg/s'
-gyro_range: 1000
-# Accelerometer low pass filter bandwidth
-acc_bandwidth: 40
-# Gyroscope low pass filter bandwidth
-gyro_bandwidth: 40
-# group_delay of imu,
-# which means the latency of the motion of body to data ready, unit 'ms'
-group_delay: 7
-# imu_data_path from which we read imu data
-imu_data_path: "/dev/input/event2"
-# imu_virtual_path from which we init imu
-imu_virtual_path: "/sys/devices/virtual/input/input0/"
-```
-
-
-## X3 linaro
-Copy the install directory cross compiled by docker to X3 directory, 
-such as `/userdata`. Then run command:
-```
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/userdata/install/lib`
-```
-
-Change ROS_LOG_DIR and run `mount -o remount,rw /`
-```
-export ROS_LOG_DIR=/userdata/
-mount -o remount,rw /
-```
-
-launch imu_sensor
-```
-#/userdata/install/lib/imu_sensor/imu_sensor --ros-args -p config_file_path:=/userdata/install/lib/config/bmi088.yaml
-```
-
-Launched by 'ros2 launch':
-`ros2 launch install/share/mipi_cam/launch/mipi_cam.launch.py`
+The imu message will be published under the topic name of `/drobotics_imu/bmi08x_imu`.
